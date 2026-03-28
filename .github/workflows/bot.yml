@@ -2,18 +2,19 @@ name: 自動抓取發電數據機器人
 
 on:
   schedule:
-    - cron: '*/15 * * * *' # 每 15 分鐘執行一次
-  workflow_dispatch: # 允許手動點擊測試
+    # 這裡設定每小時的 05, 20, 35, 50 分會自動執行 (避開整點尖峰時段)
+    - cron: '5,20,35,50 * * * *'
+  workflow_dispatch: # 這裡保留手動執行的按鈕，方便你測試
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 取得程式碼
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # 升級至 v4 (消滅 Node.js 20 警告)
 
       - name: 🐍 設定 Python 環境
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5 # 升級至 v5 (消滅 Node.js 20 警告)
         with:
           python-version: '3.10'
 
