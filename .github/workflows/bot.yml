@@ -1,0 +1,33 @@
+name: 自動抓取發電數據機器人
+
+on:
+  schedule:
+    - cron: '*/15 * * * *' # 每 15 分鐘執行一次
+  workflow_dispatch: # 允許手動點擊測試
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 取得程式碼
+        uses: actions/checkout@v3
+
+      - name: 🐍 設定 Python 環境
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: 📦 安裝必備套件與隱形瀏覽器
+        run: |
+          pip install requests playwright gspread oauth2client
+          playwright install chromium
+
+      - name: 🔑 產出 Google 臨時金鑰
+        run: |
+          echo '${{ secrets.GCP_CREDENTIALS }}' > key.json
+
+      - name: 🤖 啟動機器人去 T-REC 抓資料！
+        env:
+          TREC_ACCOUNT: ${{ secrets.TREC_ACCOUNT }}
+          TREC_PASSWORD: ${{ secrets.TREC_PASSWORD }}
+        run: python auto_bot.py
