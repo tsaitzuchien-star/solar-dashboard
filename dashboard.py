@@ -31,7 +31,7 @@ components.html(
 # ==========================================
 # ☁️ 雲端資料庫連線區 (支援本地端與雲端雙重模式)
 # ==========================================
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=60)
 def load_data_from_gsheets():
     try:
         scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
