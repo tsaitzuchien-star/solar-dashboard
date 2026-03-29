@@ -31,7 +31,7 @@ components.html(
 # ==========================================
 # ☁️ 雲端資料庫連線區 (支援本地端與雲端雙重模式)
 # ==========================================
-@st.cache_data(ttl=60) # ⚡ 快取時間設為 60 秒，確保抓到最新 15 分鐘數據
+@st.cache_data(ttl=60) # ⚡ 快取時間設為 60 秒
 def load_data_from_gsheets():
     try:
         scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
@@ -69,22 +69,16 @@ if df is not None and not df.empty:
         df["當前功率(W)"] = pd.to_numeric(df["當前功率(W)"], errors='coerce')
 
         # 🛠️ --- BIPV-1 功率硬體修復魔法 (虛擬感測器) --- 🛠️
-        # 1. 先將資料依據系統與時間排序，確保計算時間差是正確的順序
         df = df.sort_values(by=["系統名稱", "紀錄時間"])
-        
-        # 2. 計算兩筆紀錄之間的「度數差」與「小時差」
         df['kWh_diff'] = df.groupby('系統名稱')['累計度數(kWh)'].diff()
         df['time_diff_hours'] = df.groupby('系統名稱')['紀錄時間'].diff().dt.total_seconds() / 3600.0
         
-        # 3. 回推功率 W = (度數 / 小時) * 1000。加上 clip(lower=0) 避免數據異常時出現負數
         estimated_watts = (df['kWh_diff'] / df['time_diff_hours']) * 1000
         estimated_watts = estimated_watts.clip(lower=0)
         
-        # 4. 找到 BIPV-1 的資料，把原本錯誤的功率用「推算的正確功率」覆蓋掉
         bipv1_mask = df['系統名稱'].str.contains('BIPV-1', na=False)
         df.loc[bipv1_mask & estimated_watts.notnull(), '當前功率(W)'] = estimated_watts[bipv1_mask & estimated_watts.notnull()].round(0)
         
-        # 5. 掃地機器人：刪除計算用的暫存欄位，並把資料按照時間反向排序(最新數據置頂)
         df = df.drop(columns=['kWh_diff', 'time_diff_hours'])
         df = df.sort_values(by="紀錄時間", ascending=False)
         # ----------------------------------------------------
@@ -138,6 +132,10 @@ if df is not None and not df.empty:
         df_today = df[df['日期'] == today_date]
 
         if not df_today.empty:
+            # 🎯 [新增] 計算「最新一筆紀錄」的全區總發電功率 (換算成 kW)
+            df_latest = df_today[df_today['紀錄時間'] == latest_time]
+            current_total_kw = df_latest['當前功率(W)'].sum() / 1000.0
+
             today_max = df_today.groupby('系統名稱')['累計度數(kWh)'].max()
             today_min = df_today.groupby('系統名稱')['累計度數(kWh)'].min()
             today_yield = (today_max - today_min).round(2).reset_index() 
@@ -148,7 +146,13 @@ if df is not None and not df.empty:
             col1, col2 = st.columns([1, 2])
 
             with col1:
-                st.metric("🌞 今日全區總發電量", f"{today_total:,.2f} kWh")
+                # 🎯 [新增] 把左邊的區塊再切成兩半，讓這兩個指標並排顯示！
+                sub_col1, sub_col2 = st.columns(2)
+                with sub_col1:
+                    st.metric("🌞 今日全區總發電量", f"{today_total:,.2f} kWh")
+                with sub_col2:
+                    st.metric("⚡ 目前總發電功率", f"{current_total_kw:,.2f} kW")
+                
                 st.dataframe(today_yield, use_container_width=True)
 
             with col2:
@@ -163,7 +167,6 @@ if df is not None and not df.empty:
             st.warning("⚠️ 目前尚無今日的發電數據。")
 
         with st.expander("查看雲端原始數據庫"):
-            # 取消 Pandas 美化設定，直接印出原始資料以突破 26 萬格限制
             st.dataframe(df, use_container_width=True)
             
     except Exception as e:
