@@ -16,13 +16,13 @@ st.title("☀️ 中創園區太陽能監控戰情室 (雲端直連版)")
 st.markdown("這套 11 年太陽能系統的活化數據，正由你的自動化機器人實時守護中。")
 st.markdown("---")
 
-# ⏱️ 隱形計時器：每 5 分鐘 (300,000 毫秒) 自動重整網頁
+# ⏱️ 隱形計時器：每 15 分鐘 (900,000 毫秒) 自動重整網頁
 components.html(
     """
     <script>
     setTimeout(function(){
         window.parent.location.reload();
-    }, 300000);
+    }, 900000);
     </script>
     """,
     height=0
@@ -31,12 +31,11 @@ components.html(
 # ==========================================
 # ☁️ 雲端資料庫連線區 (支援本地端與雲端雙重模式)
 # ==========================================
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=60) # ⚡ 已經幫你縮短為 60 秒！以後不用手動清快取了！
 def load_data_from_gsheets():
     try:
         scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
         
-        # 🔐 雲端保險箱機制：先嘗試讀取雲端密碼，如果失敗就讀本地 key.json
         try:
             creds_dict = dict(st.secrets["gcp_service_account"])
             creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
@@ -67,7 +66,29 @@ if df is not None and not df.empty:
         # 資料格式轉換
         df["紀錄時間"] = pd.to_datetime(df["紀錄時間"])
         df["累計度數(kWh)"] = pd.to_numeric(df["累計度數(kWh)"], errors='coerce')
+        df["當前功率(W)"] = pd.to_numeric(df["當前功率(W)"], errors='coerce')
+
+        # 🛠️ --- BIPV-1 功率硬體修復魔法 (虛擬感測器) --- 🛠️
+        # 1. 先將資料依據系統與時間排序，確保計算時間差是正確的順序
+        df = df.sort_values(by=["系統名稱", "紀錄時間"])
         
+        # 2. 計算兩筆紀錄之間的「度數差」與「小時差」
+        df['kWh_diff'] = df.groupby('系統名稱')['累計度數(kWh)'].diff()
+        df['time_diff_hours'] = df.groupby('系統名稱')['紀錄時間'].diff().dt.total_seconds() / 3600.0
+        
+        # 3. 回推功率 W = (度數 / 小時) * 1000。加上 clip(lower=0) 避免數據異常時出現負數
+        estimated_watts = (df['kWh_diff'] / df['time_diff_hours']) * 1000
+        estimated_watts = estimated_watts.clip(lower=0)
+        
+        # 4. 找到 BIPV-1 的資料，把原本錯誤的功率用「推算的正確功率」覆蓋掉
+        bipv1_mask = df['系統名稱'].str.contains('BIPV-1', na=False)
+        df.loc[bipv1_mask & estimated_watts.notnull(), '當前功率(W)'] = estimated_watts[bipv1_mask & estimated_watts.notnull()].round(0)
+        
+        # 5. 掃地機器人：刪除計算用的暫存欄位，並把資料按照時間反向排序(最新數據置頂)
+        df = df.drop(columns=['kWh_diff', 'time_diff_hours'])
+        df = df.sort_values(by="紀錄時間", ascending=False)
+        # ----------------------------------------------------
+
         df['年份'] = df["紀錄時間"].dt.year
         df['月份'] = df["紀錄時間"].dt.month
         df['日期'] = df['紀錄時間'].dt.date
@@ -112,6 +133,7 @@ if df is not None and not df.empty:
         today_date = latest_time.date()
         
         st.caption(f"🕒 雲端數據最新更新時間：**{latest_time.strftime('%Y-%m-%d %H:%M:%S')}**")
+        st.markdown("*💡 註：系統將每 15 分鐘自動巡邏更新一次最新數據。*")
         
         df_today = df[df['日期'] == today_date]
 
@@ -141,7 +163,8 @@ if df is not None and not df.empty:
             st.warning("⚠️ 目前尚無今日的發電數據。")
 
         with st.expander("查看雲端原始數據庫"):
-            st.dataframe(df.sort_values(by="紀錄時間", ascending=False), width='stretch')
+            # 在表格中把小數點去掉，讓功率看起來更像真實儀表的數字
+            st.dataframe(df.style.format({"當前功率(W)": "{:.0f}"}), width='stretch')
             
     except Exception as e:
         st.error(f"資料處理時發生錯誤：{e}")
