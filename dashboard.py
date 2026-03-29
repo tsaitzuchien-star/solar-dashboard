@@ -163,8 +163,8 @@ if df is not None and not df.empty:
             st.warning("⚠️ 目前尚無今日的發電數據。")
 
         with st.expander("查看雲端原始數據庫"):
-            # 在表格中把小數點去掉，讓功率看起來更像真實儀表的數字
-            st.dataframe(df.style.format({"當前功率(W)": "{:.0f}"}), width='stretch')
+           with st.expander("查看雲端原始數據庫"):
+    st.dataframe(df, width='stretch')
             
     except Exception as e:
         st.error(f"資料處理時發生錯誤：{e}")
