@@ -31,7 +31,7 @@ components.html(
 # ==========================================
 # ☁️ 雲端資料庫連線區 (支援本地端與雲端雙重模式)
 # ==========================================
-@st.cache_data(ttl=60) # ⚡ 已經幫你縮短為 60 秒！以後不用手動清快取了！
+@st.cache_data(ttl=60) # ⚡ 快取時間設為 60 秒，確保抓到最新 15 分鐘數據
 def load_data_from_gsheets():
     try:
         scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
@@ -149,7 +149,7 @@ if df is not None and not df.empty:
 
             with col1:
                 st.metric("🌞 今日全區總發電量", f"{today_total:,.2f} kWh")
-                st.dataframe(today_yield, width='stretch')
+                st.dataframe(today_yield, use_container_width=True)
 
             with col2:
                 fig_today = px.bar(
@@ -158,13 +158,13 @@ if df is not None and not df.empty:
                 )
                 fig_today.update_layout(hovermode="x unified")
                 fig_today.update_traces(textposition='outside')
-                st.plotly_chart(fig_today, width='stretch')
+                st.plotly_chart(fig_today, use_container_width=True)
         else:
             st.warning("⚠️ 目前尚無今日的發電數據。")
 
         with st.expander("查看雲端原始數據庫"):
-           with st.expander("查看雲端原始數據庫"):
-    st.dataframe(df, width='stretch')
+            # 取消 Pandas 美化設定，直接印出原始資料以突破 26 萬格限制
+            st.dataframe(df, use_container_width=True)
             
     except Exception as e:
         st.error(f"資料處理時發生錯誤：{e}")
