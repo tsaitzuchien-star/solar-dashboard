@@ -2,12 +2,12 @@ import os
 import datetime
 import requests
 import gspread
+import re  # 🎯 新增正則表達式套件，用來精準捕捉網頁上的數字
 from oauth2client.service_account import ServiceAccountCredentials
 from playwright.sync_api import sync_playwright
 
 # ==========================================
 # 🔐 安全升級：改從 GitHub 雲端保險箱讀取帳號密碼
-# (這裡不需要再手動輸入帳密了，它會自己去抓)
 # ==========================================
 TREC_ACCOUNT = os.environ.get("TREC_ACCOUNT")
 TREC_PASSWORD = os.environ.get("TREC_PASSWORD")
@@ -16,14 +16,12 @@ TREC_PASSWORD = os.environ.get("TREC_PASSWORD")
 def run_auto_bot():
     print(f"🤖 [{datetime.datetime.now().strftime('%H:%M:%S')}] 自動機器人啟動中 (GitHub Actions 雲端模式)...")
 
-    # 檢查保險箱密碼是否有成功讀取
     if not TREC_ACCOUNT or not TREC_PASSWORD:
         print("❌ 錯誤：找不到帳號或密碼！請確認 GitHub Secrets 設定是否正確。")
         return
 
     # --- 第一階段：登入 T-REC 抓資料 ---
     with sync_playwright() as p:
-        # 雲端環境直接啟動隱形瀏覽器即可
         browser = p.chromium.launch(headless=True)
         context = browser.new_context()
         page = context.new_page()
@@ -61,6 +59,35 @@ def run_auto_bot():
                 return
 
             print("   ✅ 成功進入 T-REC，開始抓取最新發電數據...")
+            
+            # 🎯 --- [新增] 綠電憑證抓取雷達 --- 🎯
+            trec_count = None
+            try:
+                page.wait_for_timeout(2000) # 等待數字載入
+                body_text = page.locator("body").inner_text()
+                lines = body_text.split('\n')
+                
+                # 掃描網頁文字，尋找「已發證數量」附近的純數字
+                for i, line in enumerate(lines):
+                    if '已發證數量' in line:
+                        for j in range(1, 15): 
+                            if i + j < len(lines):
+                                val = lines[i+j].strip()
+                                # 如果這行是純數字(允許包含千分位逗號)
+                                if re.match(r'^[\d,]+$', val):
+                                    trec_count = val.replace(',', '') # 移除逗號
+                                    break
+                        if trec_count:
+                            break
+                
+                if trec_count:
+                    print(f"   📜 成功在戰情首頁掃描到綠電憑證數量：{trec_count} 張！")
+                else:
+                    print("   ⚠️ 找不到憑證數量，將跳過憑證紀錄。")
+            except Exception as e:
+                print(f"   ⚠️ 抓取憑證數量發生錯誤：{e}")
+            # ----------------------------------------
+
             csrf_token = page.evaluate('() => document.querySelector("meta[name=\'csrf-token\']").content')
             cookies = "; ".join([f"{c['name']}={c['value']}" for c in context.cookies()])
         
@@ -108,18 +135,45 @@ def run_auto_bot():
                 pass
 
         # --- 第三階段：連線 Google 試算表並寫入 ---
-        if not new_records_buffer:
-            print("   👀 系統目前沒有產出任何發電度數。")
-            return
-
         print("   ☁️ 準備將資料同步至 Google 試算表...")
         scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
         
         try:
-            # 這裡會讀取 GitHub Actions 動態產生的金鑰檔案
             creds = ServiceAccountCredentials.from_json_keyfile_name("key.json", scope)
             client = gspread.authorize(creds)
-            sheet = client.open("中創園區_太陽能發電紀錄_雲端版").sheet1
+            spreadsheet = client.open("中創園區_太陽能發電紀錄_雲端版")
+            sheet = spreadsheet.sheet1
+
+            # 🎯 --- [新增] 寫入憑證數量到專屬分頁 --- 🎯
+            if trec_count:
+                try:
+                    try:
+                        cert_sheet = spreadsheet.worksheet("憑證紀錄")
+                    except gspread.exceptions.WorksheetNotFound:
+                        cert_sheet = spreadsheet.add_worksheet(title="憑證紀錄", rows="1000", cols="2")
+                        cert_sheet.append_row(["更新時間", "已發證數量(張)"])
+
+                    # 檢查最後一筆憑證數量，如果沒有變動就不重複寫入
+                    cert_data = cert_sheet.get_all_values()
+                    should_write = True
+                    if len(cert_data) > 1:
+                        last_count = cert_data[-1][1]
+                        if str(last_count) == str(trec_count):
+                            should_write = False
+                    
+                    if should_write:
+                        current_time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        cert_sheet.append_row([current_time_str, trec_count])
+                        print(f"   🎉 綠電憑證增加啦！已將 {trec_count} 張最新紀錄寫入「憑證紀錄」分頁！")
+                    else:
+                        print(f"   👀 綠電憑證數量維持在 {trec_count} 張，無需重複寫入。")
+                except Exception as e:
+                    print(f"   ❌ 憑證分頁寫入失敗：{e}")
+            # ----------------------------------------
+
+            if not new_records_buffer:
+                print("   👀 系統目前沒有產出任何新的發電度數。")
+                return
 
             # 🛡️ 雲端防重複機制
             existing_data = sheet.get_all_values()
