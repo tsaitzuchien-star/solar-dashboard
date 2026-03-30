@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 st.set_page_config(page_title="中創園區太陽能戰情室", layout="wide", page_icon="☀️")
 
 st.title("☀️ 中創園區太陽能監控戰情室 (雲端直連版)")
-st.markdown("這套 11 年太陽能系統的活化數據，正由你的自動化機器人實時守護中。")
+st.markdown("這套 11 年太陽能系統的活化數據，正由中創行政服務部門實時守護中。")
 st.markdown("---")
 
 # ⏱️ 隱形計時器：每 15 分鐘自動重整網頁
@@ -132,10 +132,14 @@ if df is not None and not df.empty:
         latest_time = df["紀錄時間"].max()
         today_date = latest_time.date()
         
-        # 🎯 取得最新綠電憑證數量
+        # 🎯 [1] 取得最新綠電憑證數量 (歷年累計)
         trec_count_display = "載入中..."
         if df_cert is not None and not df_cert.empty:
             trec_count_display = f"{df_cert.iloc[-1]['已發證數量(張)']} 張"
+            
+        # 🎯 [2] 新增：計算今年度的專屬憑證數量 (今年總度數 / 1000)
+        total_kwh_this_year = df_current_year['當月發電量(kWh)'].sum()
+        trec_this_year = int(total_kwh_this_year // 1000) # 無條件捨去取整數
         
         st.caption(f"🕒 雲端數據最新更新時間：**{latest_time.strftime('%Y-%m-%d %H:%M:%S')}**")
         st.markdown("*💡 註：系統將每 15 分鐘自動巡邏更新一次最新數據與綠電憑證。*")
@@ -156,8 +160,12 @@ if df is not None and not df.empty:
             col1, col2 = st.columns([1, 2])
 
             with col1:
-                # 🎯 [新增] 最耀眼的綠電憑證儀表板
-                st.metric("📜 綠電憑證累計總數 (T-REC)", trec_count_display)
+                # 🎯 [升級] 綠電憑證雙儀表板 (歷年總和 vs 今年度)
+                cert_col1, cert_col2 = st.columns(2)
+                with cert_col1:
+                    st.metric("📜 歷年累計憑證總數", trec_count_display)
+                with cert_col2:
+                    st.metric(f"🌱 {current_year} 年已獲憑證", f"{trec_this_year} 張")
                 
                 # 原本的發電量與功率
                 sub_col1, sub_col2 = st.columns(2)
