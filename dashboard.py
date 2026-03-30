@@ -91,10 +91,10 @@ if df is not None and not df.empty:
         st.subheader("⚡ 今日 15 分鐘區間發電監控")
         latest_time = df["紀錄時間"].max()
         
-        # 🎯 [新增] 過濾時間：僅保留 05:00 到 18:00
+        # 🎯 [新增] 過濾時間：僅保留 06:00 到 18:00
         today_df = df[
             (df['日期'] == latest_time.date()) & 
-            (df['紀錄時間'].dt.hour >= 5) & 
+            (df['紀錄時間'].dt.hour >= 6) & 
             (df['紀錄時間'].dt.hour < 18)
         ].copy()
         
