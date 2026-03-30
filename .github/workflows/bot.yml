@@ -1,8 +1,11 @@
 name: 自動抓取發電數據機器人
 
 on:
-  # 內部定時器 (schedule) 已經刪除，現在全部交由外部 cron-job.org 精準觸發！
   workflow_dispatch: # 這裡只保留接受外部 API 喚醒，以及你手動點擊的權限
+
+# 👇 就是加了這兩行，強制機器人換上最新的 Node.js 24 引擎！
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   run-bot:
