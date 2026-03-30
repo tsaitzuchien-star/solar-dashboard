@@ -59,6 +59,8 @@ if df is not None and not df.empty:
         df["紀錄時間"] = pd.to_datetime(df["紀錄時間"])
         df["累計度數(kWh)"] = pd.to_numeric(df["累計度數(kWh)"], errors='coerce')
         df["當前功率(W)"] = pd.to_numeric(df["當前功率(W)"], errors='coerce')
+        df['年份'] = df["紀錄時間"].dt.year
+        df['月份'] = df["紀錄時間"].dt.month
         df['日期'] = df['紀錄時間'].dt.date
 
         # 計算每段發電量 (15分鐘增量)
@@ -71,10 +73,23 @@ if df is not None and not df.empty:
         bipv1_mask = df['系統名稱'].str.contains('BIPV-1', na=False)
         df.loc[bipv1_mask & estimated_watts.notnull(), '當前功率(W)'] = estimated_watts[bipv1_mask & estimated_watts.notnull()].round(0)
 
-        # --- 年度 KPI 區 ---
+        # ==========================================
+        # 🎯 年度 KPI 與 YoY 比較區 (重新加回來啦！)
+        # ==========================================
         st.subheader(f"📈 {datetime.datetime.now().year} 年度：發電成效與綠電憑證追蹤")
-        this_year_df = df[df['紀錄時間'].dt.year == datetime.datetime.now().year]
-        this_year_total_kwh = (this_year_df.groupby('系統名稱')['累計度數(kWh)'].max() - this_year_df.groupby('系統名稱')['累計度數(kWh)'].min()).sum()
+        
+        # 1. 處理月份 YoY 邏輯
+        monthly_sys = df.groupby(['年份', '月份', '系統名稱'])['累計度數(kWh)'].agg(['max', 'min']).reset_index()
+        monthly_sys['當月發電量(kWh)'] = monthly_sys['max'] - monthly_sys['min']
+        monthly_total = monthly_sys.groupby(['年份', '月份'])['當月發電量(kWh)'].sum().reset_index()
+
+        current_year = datetime.datetime.now().year
+        last_year = current_year - 1
+        df_current_year = monthly_total[monthly_total['年份'] == current_year]
+        months_this_year = df_current_year['月份'].unique()
+
+        # 2. 顯示年度憑證與進度條
+        this_year_total_kwh = df_current_year['當月發電量(kWh)'].sum()
         current_certs = int(this_year_total_kwh / 1000)
         target_certs = 210
         
@@ -82,23 +97,46 @@ if df is not None and not df.empty:
         with col_cert1:
             st.metric("📜 累積綠電憑證", f"{current_certs} 張", f"目標 {target_certs} 張")
         with col_cert2:
-            st.markdown(f"<b>🎯 年度目標達成率：{(current_certs/target_certs)*100:.1f}%</b>", unsafe_allow_html=True)
+            st.markdown(f"<div style='margin-top: 10px; font-size: 18px;'><b>🎯 年度目標達成率：{(current_certs/target_certs)*100:.1f}%</b></div>", unsafe_allow_html=True)
             st.progress(min(current_certs / target_certs, 1.0))
-        
+            
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # 3. 顯示各月份 YoY 指標
+        if len(months_this_year) > 0:
+            cols = st.columns(len(months_this_year))
+            for i, m in enumerate(sorted(months_this_year)):
+                this_year_kwh = monthly_total[(monthly_total['年份'] == current_year) & (monthly_total['月份'] == m)]['當月發電量(kWh)'].sum()
+                last_year_kwh = monthly_total[(monthly_total['年份'] == last_year) & (monthly_total['月份'] == m)]['當月發電量(kWh)'].sum()
+
+                if last_year_kwh > 0:
+                    diff = this_year_kwh - last_year_kwh
+                    diff_pct = (diff / last_year_kwh) * 100
+                    delta_str = f"{diff:,.2f} kWh ({diff_pct:+.1f}% YoY)"
+                else:
+                    delta_str = "⚠️ 尚無去年同期資料"
+
+                with cols[i]:
+                    st.metric(f"🎯 {m} 月份發電量", f"{this_year_kwh:,.2f} kWh", delta=delta_str)
+        else:
+            st.info(f"💡 目前資料庫尚未包含 {current_year} 年的數據。")
+
         st.markdown("---")
 
-        # --- 今日即時監控區 ---
+        # ==========================================
+        # ⚡ 今日即時監控區 (06:00 - 18:00)
+        # ==========================================
         st.subheader("⚡ 今日 15 分鐘區間發電監控")
         latest_time = df["紀錄時間"].max()
         
-        # 🎯 [新增] 過濾時間：僅保留 06:00 到 18:00
+        # 🎯 過濾時間：僅保留 06:00 到 18:00
         today_df = df[
             (df['日期'] == latest_time.date()) & 
             (df['紀錄時間'].dt.hour >= 6) & 
             (df['紀錄時間'].dt.hour < 18)
         ].copy()
         
-        st.caption(f"🕒 最後更新點：**{latest_time.strftime('%H:%M')}** (數據範圍：05:00 - 18:00)")
+        st.caption(f"🕒 最後更新點：**{latest_time.strftime('%H:%M')}** (數據範圍：06:00 - 18:00)")
 
         if not today_df.empty:
             # 指標計算
@@ -111,27 +149,48 @@ if df is not None and not df.empty:
             c2.metric("⚡ 目前即時總功率", f"{current_total_kw:,.2f} kW")
             c3.metric("📊 最新發電增量", f"{today_df[today_df['紀錄時間']==latest_time]['每段發電量(kWh)'].sum():.2f} kWh")
 
-            # 15分鐘區間加總柱狀圖
             today_df['時間'] = today_df['紀錄時間'].dt.strftime('%H:%M')
+            today_df['當前功率(kW)'] = today_df['當前功率(W)'] / 1000.0
             
-            fig_bar = px.bar(
+            # --- 圖表 1：每 15 分鐘「發電量 (kWh)」長條圖 ---
+            fig_bar_kwh = px.bar(
                 today_df.sort_values('紀錄時間'), 
                 x="時間", 
                 y="每段發電量(kWh)", 
                 color="系統名稱",
-                title=f"{latest_time.date()} 發電時序圖 (05:00-18:00 精華時段)",
+                title=f"{latest_time.date()} 發電量時序圖 - 觀察實質收穫 (kWh)",
                 template="plotly_white",
                 color_discrete_sequence=px.colors.qualitative.Set2,
                 text_auto='.2f'
             )
-            fig_bar.update_layout(
+            fig_bar_kwh.update_layout(
                 hovermode="x unified",
                 xaxis_title="紀錄點",
                 yaxis_title="發電量增量 (kWh)",
                 barmode='stack',
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
             )
-            st.plotly_chart(fig_bar, use_container_width=True)
+            st.plotly_chart(fig_bar_kwh, use_container_width=True)
+
+            # --- 圖表 2：每 15 分鐘「即時功率 (kW)」長條圖 ---
+            fig_bar_kw = px.bar(
+                today_df.sort_values('紀錄時間'), 
+                x="時間", 
+                y="當前功率(kW)", 
+                color="系統名稱",
+                title=f"{latest_time.date()} 發電功率時序圖 - 觀察出力強度 (kW)",
+                template="plotly_white",
+                color_discrete_sequence=px.colors.qualitative.Pastel,
+                text_auto='.1f'
+            )
+            fig_bar_kw.update_layout(
+                hovermode="x unified",
+                xaxis_title="紀錄點",
+                yaxis_title="即時功率 (kW)",
+                barmode='stack',
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            st.plotly_chart(fig_bar_kw, use_container_width=True)
             
             with st.expander("各子系統今日數據統計"):
                 sys_summary = today_df.groupby('系統名稱').agg({
