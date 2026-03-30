@@ -13,10 +13,10 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 st.set_page_config(page_title="中創園區太陽能戰情室", layout="wide", page_icon="☀️")
 
 st.title("☀️ 中創園區太陽能監控戰情室 (雲端直連版)")
-st.markdown("這套 11 年太陽能系統的活化數據，正由中創行政服務部門實時守護中。")
+st.markdown("這套 11 年太陽能系統的活化數據，正由你的自動化機器人實時守護中。")
 st.markdown("---")
 
-# ⏱️ 隱形計時器：每 15 分鐘自動重整網頁
+# ⏱️ 隱形計時器：每 15 分鐘 (900,000 毫秒) 自動重整網頁
 components.html(
     """
     <script>
@@ -29,9 +29,9 @@ components.html(
 )
 
 # ==========================================
-# ☁️ 雲端資料庫連線區 (同時讀取發電與憑證)
+# ☁️ 雲端資料庫連線區 (支援本地端與雲端雙重模式)
 # ==========================================
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=60) # ⚡ 快取時間設為 60 秒
 def load_data_from_gsheets():
     try:
         scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
@@ -43,29 +43,23 @@ def load_data_from_gsheets():
             creds = ServiceAccountCredentials.from_json_keyfile_name("key.json", scope)
             
         client = gspread.authorize(creds)
-        spreadsheet = client.open("中創園區_太陽能發電紀錄_雲端版")
+        sheet = client.open("中創園區_太陽能發電紀錄_雲端版").sheet1
         
-        # 1. 讀取主發電數據
-        sheet = spreadsheet.sheet1
         data = sheet.get_all_values()
-        df = pd.DataFrame(data[1:], columns=data[0]) if len(data) > 1 else pd.DataFrame()
         
-        # 2. 🎯 讀取專屬的憑證紀錄
-        try:
-            cert_sheet = spreadsheet.worksheet("憑證紀錄")
-            cert_data = cert_sheet.get_all_values()
-            df_cert = pd.DataFrame(cert_data[1:], columns=cert_data[0]) if len(cert_data) > 1 else pd.DataFrame()
-        except:
-            df_cert = pd.DataFrame()
-            
-        return df, df_cert
+        if len(data) > 1:
+            headers = data[0]
+            rows = data[1:]
+            df = pd.DataFrame(rows, columns=headers)
+            return df
+        return pd.DataFrame()
     except Exception as e:
         st.error(f"連線雲端資料庫發生錯誤：{e}")
-        return None, None
+        return None
 
 # 開始讀取雲端資料
-with st.spinner('⏳ 正在從 Google 雲端下載最新發電與憑證數據...'):
-    df, df_cert = load_data_from_gsheets()
+with st.spinner('⏳ 正在從 Google 雲端下載最新發電數據...'):
+    df = load_data_from_gsheets()
 
 if df is not None and not df.empty:
     try:
@@ -104,8 +98,27 @@ if df is not None and not df.empty:
         df_current_year = monthly_total[monthly_total['年份'] == current_year]
         months_this_year = df_current_year['月份'].unique()
 
-        st.subheader(f"📈 {current_year} 年度：各月發電成效與 YoY (年增率) 追蹤")
+        st.subheader(f"📈 {current_year} 年度：發電成效與綠電憑證 (T-REC) 追蹤")
         
+        # 🎯 [新增] 年度憑證目標與進度條 (1張 = 1,000度)
+        this_year_total_kwh = df_current_year['當月發電量(kWh)'].sum()
+        current_certs = int(this_year_total_kwh / 1000)
+        target_certs = 210
+        achieve_rate = (current_certs / target_certs) * 100
+        
+        # 使用左右排版，左邊放數字，右邊放進度條
+        col_cert1, col_cert2 = st.columns([1, 4])
+        with col_cert1:
+            st.metric("📜 累積綠電憑證", f"{current_certs} 張", f"年度目標：{target_certs} 張", delta_color="off")
+        with col_cert2:
+            st.markdown(f"<div style='margin-top: 10px; font-size: 18px;'><b>🎯 年度目標達成率：{achieve_rate:.1f}%</b></div>", unsafe_allow_html=True)
+            # 畫出進度條，並確保超過 100% 時不會報錯
+            progress_bar_val = min(current_certs / target_certs, 1.0)
+            st.progress(progress_bar_val)
+            
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # 各月份發電量指標
         if len(months_this_year) > 0:
             cols = st.columns(len(months_this_year))
             for i, m in enumerate(sorted(months_this_year)):
@@ -132,17 +145,8 @@ if df is not None and not df.empty:
         latest_time = df["紀錄時間"].max()
         today_date = latest_time.date()
         
-        # 🎯 [1] 取得最新綠電憑證數量 (歷年累計)
-        trec_count_display = "載入中..."
-        if df_cert is not None and not df_cert.empty:
-            trec_count_display = f"{df_cert.iloc[-1]['已發證數量(張)']} 張"
-            
-        # 🎯 [2] 新增：計算今年度的專屬憑證數量 (今年總度數 / 1000)
-        total_kwh_this_year = df_current_year['當月發電量(kWh)'].sum()
-        trec_this_year = int(total_kwh_this_year // 1000) # 無條件捨去取整數
-        
         st.caption(f"🕒 雲端數據最新更新時間：**{latest_time.strftime('%Y-%m-%d %H:%M:%S')}**")
-        st.markdown("*💡 註：系統將每 15 分鐘自動巡邏更新一次最新數據與綠電憑證。*")
+        st.markdown("*💡 註：系統將每 15 分鐘自動巡邏更新一次最新數據。*")
         
         df_today = df[df['日期'] == today_date]
 
@@ -160,14 +164,6 @@ if df is not None and not df.empty:
             col1, col2 = st.columns([1, 2])
 
             with col1:
-                # 🎯 [升級] 綠電憑證雙儀表板 (歷年總和 vs 今年度)
-                cert_col1, cert_col2 = st.columns(2)
-                with cert_col1:
-                    st.metric("📜 歷年累計憑證總數", trec_count_display)
-                with cert_col2:
-                    st.metric(f"🌱 {current_year} 年已獲憑證", f"{trec_this_year} 張")
-                
-                # 原本的發電量與功率
                 sub_col1, sub_col2 = st.columns(2)
                 with sub_col1:
                     st.metric("🌞 今日全區總發電量", f"{today_total:,.2f} kWh")
