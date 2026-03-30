@@ -12,8 +12,9 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 st.set_page_config(page_title="中創園區太陽能戰情室", layout="wide", page_icon="☀️")
 
-st.title("☀️ 中創園區太陽能監控戰情室 (雲端直連版)")
-st.markdown("這套 11 年太陽能系統的活化數據，正由你的自動化機器人實時守護中。")
+# 🎯 [修改] 移除(雲端直連版)，並換上行政服務部的專屬台詞！
+st.title("☀️ 中創園區太陽能監控戰情室")
+st.markdown("這套 11 年太陽能系統的活化數據，正由中創行政服務部實時守護中。")
 st.markdown("---")
 
 # ⏱️ 隱形計時器：每 15 分鐘 (900,000 毫秒) 自動重整網頁
@@ -100,7 +101,7 @@ if df is not None and not df.empty:
 
         st.subheader(f"📈 {current_year} 年度：發電成效與綠電憑證 (T-REC) 追蹤")
         
-        # 🎯 [新增] 年度憑證目標與進度條 (1張 = 1,000度)
+        # 🎯 年度憑證目標與進度條 (1張 = 1,000度)
         this_year_total_kwh = df_current_year['當月發電量(kWh)'].sum()
         current_certs = int(this_year_total_kwh / 1000)
         target_certs = 210
