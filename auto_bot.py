@@ -2,7 +2,7 @@ import os
 import datetime
 import requests
 import gspread
-import re  # 🎯 新增正則表達式套件，用來精準捕捉網頁上的數字
+import re  # 🎯 引入正則表達式，用來精準萃取數字
 from oauth2client.service_account import ServiceAccountCredentials
 from playwright.sync_api import sync_playwright
 
@@ -60,30 +60,26 @@ def run_auto_bot():
 
             print("   ✅ 成功進入 T-REC，開始抓取最新發電數據...")
             
-            # 🎯 --- [新增] 綠電憑證抓取雷達 --- 🎯
+            # 🎯 --- [升級] 更強大的綠電憑證抓取雷達 --- 🎯
             trec_count = None
             try:
                 page.wait_for_timeout(2000) # 等待數字載入
                 body_text = page.locator("body").inner_text()
-                lines = body_text.split('\n')
                 
-                # 掃描網頁文字，尋找「已發證數量」附近的純數字
-                for i, line in enumerate(lines):
-                    if '已發證數量' in line:
-                        for j in range(1, 15): 
-                            if i + j < len(lines):
-                                val = lines[i+j].strip()
-                                # 如果這行是純數字(允許包含千分位逗號)
-                                if re.match(r'^[\d,]+$', val):
-                                    trec_count = val.replace(',', '') # 移除逗號
-                                    break
-                        if trec_count:
-                            break
-                
-                if trec_count:
-                    print(f"   📜 成功在戰情首頁掃描到綠電憑證數量：{trec_count} 張！")
+                if '已發證數量' in body_text:
+                    # 切割出 '已發證數量' 後面的所有文字
+                    text_after = body_text.split('已發證數量')[1]
+                    
+                    # 🔍 智慧數字萃取：忽略帶小數點的數字 (如 1.607, 62.24)，只抓取千分位或整數 (如 1,671)
+                    matches = re.findall(r'(?<![\d\.])(\d{1,3}(?:,\d{3})+|\d+)(?![\d\.])', text_after)
+                    
+                    if matches:
+                        trec_count = matches[0].replace(',', '')
+                        print(f"   📜 成功在戰情首頁掃描到綠電憑證數量：{trec_count} 張！")
+                    else:
+                        print("   ⚠️ 找到標題，但無法辨識憑證數字。")
                 else:
-                    print("   ⚠️ 找不到憑證數量，將跳過憑證紀錄。")
+                    print("   ⚠️ 網頁中找不到 '已發證數量' 的標題。")
             except Exception as e:
                 print(f"   ⚠️ 抓取憑證數量發生錯誤：{e}")
             # ----------------------------------------
