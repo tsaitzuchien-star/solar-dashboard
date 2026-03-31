@@ -91,10 +91,16 @@ if df is not None and not df.empty:
         current_certs = int(this_year_total_kwh / 1000)
         target_certs = 210
         
-        col_cert1, col_cert2 = st.columns([1, 4])
+        # 🎯 取得歷史總發電量 (各系統最大累計度數的加總)
+        all_time_total_kwh = df.groupby('系統名稱')['累計度數(kWh)'].max().sum()
+        
+        col_cert1, col_cert2, col_cert3 = st.columns([1.5, 1, 3])
         with col_cert1:
-            st.metric("📜 累積綠電憑證", f"{current_certs} 張", f"目標 {target_certs} 張")
+            # ✨ 幫您把算出來的 119 萬度放進這裡了！以後它會自動往上加！
+            st.metric("🌍 建置至今歷史總發電量", f"{all_time_total_kwh:,.2f} kWh")
         with col_cert2:
+            st.metric("📜 累積綠電憑證", f"{current_certs} 張", f"目標 {target_certs} 張")
+        with col_cert3:
             st.markdown(f"<div style='margin-top: 10px; font-size: 18px;'><b>🎯 年度目標達成率：{(current_certs/target_certs)*100:.1f}%</b></div>", unsafe_allow_html=True)
             st.progress(min(current_certs / target_certs, 1.0))
             
@@ -126,7 +132,7 @@ if df is not None and not df.empty:
         st.subheader("⚡ 今日 15 分鐘區間發電監控")
         latest_time = df["紀錄時間"].max()
         
-        # 🎯 取得「今天一整天」的完整資料 (用於指標與表格，確保最新時間正確)
+        # 🎯 取得「今天一整天」的完整資料 
         full_today_df = df[df['日期'] == latest_time.date()].copy()
         
         # 🎯 圖表專用過濾：僅保留 06:00 到 18:00
@@ -138,7 +144,6 @@ if df is not None and not df.empty:
         st.caption(f"🕒 最後更新點：**{latest_time.strftime('%H:%M')}** (圖表顯示範圍：06:00 - 18:00)")
 
         if not full_today_df.empty:
-            # 1. 頂部指標計算 (使用 full_today_df，抓取真實數據)
             df_latest = full_today_df[full_today_df['紀錄時間'] == latest_time]
             current_total_kw = df_latest['當前功率(W)'].sum() / 1000.0
             today_total_kwh = full_today_df['每段發電量(kWh)'].sum()
@@ -149,12 +154,11 @@ if df is not None and not df.empty:
             c2.metric("⚡ 目前即時總功率", f"{current_total_kw:,.2f} kW")
             c3.metric("📊 最新發電增量", f"{latest_kwh_diff:.2f} kWh")
 
-            # 2. 圖表區 (使用 chart_df，確保圖表乾淨)
             if not chart_df.empty:
                 chart_df['時間'] = chart_df['紀錄時間'].dt.strftime('%H:%M')
                 chart_df['當前功率(kW)'] = chart_df['當前功率(W)'] / 1000.0
                 
-                # --- 圖表 1：每 15 分鐘「即時功率 (kW)」長條圖 (移到前面囉！) ---
+                # --- 圖表 1：即時功率 (kW) ---
                 fig_bar_kw = px.bar(
                     chart_df.sort_values('紀錄時間'), 
                     x="時間", 
@@ -168,7 +172,7 @@ if df is not None and not df.empty:
                 fig_bar_kw.update_layout(hovermode="x unified", xaxis_title="紀錄點", yaxis_title="即時功率 (kW)", barmode='stack')
                 st.plotly_chart(fig_bar_kw, use_container_width=True)
 
-                # --- 圖表 2：每 15 分鐘「發電量 (kWh)」長條圖 (移到後面囉！) ---
+                # --- 圖表 2：發電量 (kWh) ---
                 fig_bar_kwh = px.bar(
                     chart_df.sort_values('紀錄時間'), 
                     x="時間", 
@@ -185,7 +189,6 @@ if df is not None and not df.empty:
             else:
                 st.info("💡 目前時間不在 06:00 - 18:00 的圖表顯示範圍內。")
 
-            # 3. 系統贡献清單 (使用 full_today_df，確保功率顯示正確)
             with st.expander("各子系統今日數據統計"):
                 sys_summary = full_today_df.groupby('系統名稱').agg({
                     '每段發電量(kWh)': 'sum',
