@@ -87,7 +87,7 @@ if df is not None and not df.empty:
         df_current_year = monthly_total[monthly_total['年份'] == current_year]
         months_this_year = df_current_year['月份'].unique()
         
-        # 🎯 憑證精準推算邏輯
+        # 🎯 憑證精準推算邏輯 (以 2026-03-31 12:30 為基準錨點)
         anchor_time = pd.to_datetime('2026-03-31 12:30:00')
         anchor_certs = 56 
         anchor_leftover_kwh = 286.691
@@ -100,6 +100,7 @@ if df is not None and not df.empty:
         current_certs = anchor_certs + new_certs_earned
         target_certs = 210
         
+        # 🎯 移除歷史總量，回歸兩欄式排版
         col_cert1, col_cert2 = st.columns([1, 2.5])
         with col_cert1:
             st.metric("📜 今年累積綠電憑證", f"{current_certs} 張", f"邁向第 {current_certs + 1} 張：{current_leftover_kwh:,.1f} / 1000 kWh", delta_color="off")
@@ -159,6 +160,7 @@ if df is not None and not df.empty:
                 chart_df['時間'] = chart_df['紀錄時間'].dt.strftime('%H:%M')
                 chart_df['當前功率(kW)'] = chart_df['當前功率(W)'] / 1000.0
                 
+                # 圖表 1：即時功率 (kW)
                 fig_bar_kw = px.bar(
                     chart_df.sort_values('紀錄時間'), 
                     x="時間", 
@@ -172,6 +174,7 @@ if df is not None and not df.empty:
                 fig_bar_kw.update_layout(hovermode="x unified", xaxis_title="紀錄點", yaxis_title="即時功率 (kW)", barmode='stack')
                 st.plotly_chart(fig_bar_kw, use_container_width=True)
 
+                # 圖表 2：發電量 (kWh)
                 fig_bar_kwh = px.bar(
                     chart_df.sort_values('紀錄時間'), 
                     x="時間", 
@@ -194,11 +197,9 @@ if df is not None and not df.empty:
                     '當前功率(W)': 'last' 
                 }).reset_index()
                 sys_summary.columns = ['系統名稱', '今日累積(kWh)', '最新功率(W)']
-                # 乾淨輸出，捨棄置中
                 st.dataframe(sys_summary, use_container_width=True)
 
         with st.expander("查看雲端原始數據庫"):
-            # 乾淨輸出，捨棄置中
             st.dataframe(df.sort_values('紀錄時間', ascending=False), use_container_width=True)
             
     except Exception as e:
