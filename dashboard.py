@@ -10,9 +10,6 @@ from oauth2client.service_account import ServiceAccountCredentials
 # 🤫 幫 Plotly 戴上耳塞
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-# 🌟 [新增] 解除 Pandas 繪製大表格的限制，將上限放寬到 200 萬格！
-pd.set_option("styler.render.max_elements", 2000000)
-
 st.set_page_config(page_title="中創園區太陽能戰情室", layout="wide", page_icon="☀️")
 
 st.title("☀️ 中創園區太陽能監控戰情室")
@@ -90,7 +87,7 @@ if df is not None and not df.empty:
         df_current_year = monthly_total[monthly_total['年份'] == current_year]
         months_this_year = df_current_year['月份'].unique()
         
-        # 🎯 憑證精準推算邏輯 (以 2026-03-31 12:30 為基準錨點)
+        # 🎯 憑證精準推算邏輯
         anchor_time = pd.to_datetime('2026-03-31 12:30:00')
         anchor_certs = 56 
         anchor_leftover_kwh = 286.691
@@ -198,14 +195,13 @@ if df is not None and not df.empty:
                 }).reset_index()
                 sys_summary.columns = ['系統名稱', '今日累積(kWh)', '最新功率(W)']
                 
-                # 🎯 [新增] 套用表格與標題全體置中魔法
+                # ✅ 小表格安全：保留置中魔法
                 styled_summary = sys_summary.style.set_properties(**{'text-align': 'center'}).set_table_styles([dict(selector='th', props=[('text-align', 'center')])])
                 st.dataframe(styled_summary, use_container_width=True)
 
         with st.expander("查看雲端原始數據庫"):
-            # 🎯 [新增] 套用表格與標題全體置中魔法
-            styled_df = df.sort_values('紀錄時間', ascending=False).style.set_properties(**{'text-align': 'center'}).set_table_styles([dict(selector='th', props=[('text-align', 'center')])])
-            st.dataframe(styled_df, use_container_width=True)
+            # 🚨 巨型表格解開束縛：移除會讓主機當機的置中設定，直接輸出乾淨資料
+            st.dataframe(df.sort_values('紀錄時間', ascending=False), use_container_width=True)
             
     except Exception as e:
         st.error(f"資料處理時發生錯誤：{e}")
