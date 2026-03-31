@@ -194,13 +194,11 @@ if df is not None and not df.empty:
                     '當前功率(W)': 'last' 
                 }).reset_index()
                 sys_summary.columns = ['系統名稱', '今日累積(kWh)', '最新功率(W)']
-                
-                # ✅ 小表格安全：保留置中魔法
-                styled_summary = sys_summary.style.set_properties(**{'text-align': 'center'}).set_table_styles([dict(selector='th', props=[('text-align', 'center')])])
-                st.dataframe(styled_summary, use_container_width=True)
+                # 乾淨輸出，捨棄置中
+                st.dataframe(sys_summary, use_container_width=True)
 
         with st.expander("查看雲端原始數據庫"):
-            # 🚨 巨型表格解開束縛：移除會讓主機當機的置中設定，直接輸出乾淨資料
+            # 乾淨輸出，捨棄置中
             st.dataframe(df.sort_values('紀錄時間', ascending=False), use_container_width=True)
             
     except Exception as e:
