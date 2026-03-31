@@ -87,35 +87,24 @@ if df is not None and not df.empty:
         df_current_year = monthly_total[monthly_total['年份'] == current_year]
         months_this_year = df_current_year['月份'].unique()
         
-        # 🎯 [新增] 憑證精準推算邏輯 (以 2026-03-31 12:30 為基準錨點)
+        # 🎯 憑證精準推算邏輯 (以 2026-03-31 12:30 為基準錨點)
         anchor_time = pd.to_datetime('2026-03-31 12:30:00')
-        anchor_certs = 56  # 1月(15) + 2月(19) + 3月已累積(22)
+        anchor_certs = 56 
         anchor_leftover_kwh = 286.691
         
-        # 計算基準點之後的「新增發電量」
         new_kwh_since_anchor = df[df['紀錄時間'] > anchor_time]['每段發電量(kWh)'].sum()
-        
-        # 總累積零頭
         total_leftover_kwh = anchor_leftover_kwh + new_kwh_since_anchor
-        
-        # 換算新增張數與剩下的零頭
         new_certs_earned = int(total_leftover_kwh // 1000)
         current_leftover_kwh = total_leftover_kwh % 1000
         
-        # 最終顯示數據
         current_certs = anchor_certs + new_certs_earned
         target_certs = 210
         
-        # 取得歷史總發電量
-        all_time_total_kwh = df.groupby('系統名稱')['累計度數(kWh)'].max().sum()
-        
-        col_cert1, col_cert2, col_cert3 = st.columns([1.5, 1.2, 2.8])
+        # 🎯 移除歷史總量，回歸兩欄式排版
+        col_cert1, col_cert2 = st.columns([1, 2.5])
         with col_cert1:
-            st.metric("🌍 建置至今歷史總發電量", f"{all_time_total_kwh:,.2f} kWh")
-        with col_cert2:
-            # ✨ 動態顯示邁向「下一張」的進度
             st.metric("📜 今年累積綠電憑證", f"{current_certs} 張", f"邁向第 {current_certs + 1} 張：{current_leftover_kwh:,.1f} / 1000 kWh", delta_color="off")
-        with col_cert3:
+        with col_cert2:
             st.markdown(f"<div style='margin-top: 10px; font-size: 18px;'><b>🎯 年度目標達成率：{(current_certs/target_certs)*100:.1f}%</b></div>", unsafe_allow_html=True)
             st.progress(min(current_certs / target_certs, 1.0))
             
@@ -147,10 +136,8 @@ if df is not None and not df.empty:
         st.subheader("⚡ 今日 15 分鐘區間發電監控")
         latest_time = df["紀錄時間"].max()
         
-        # 🎯 取得「今天一整天」的完整資料 
         full_today_df = df[df['日期'] == latest_time.date()].copy()
         
-        # 🎯 圖表專用過濾：僅保留 06:00 到 18:00
         chart_df = full_today_df[
             (full_today_df['紀錄時間'].dt.hour >= 6) & 
             (full_today_df['紀錄時間'].dt.hour < 18)
@@ -173,7 +160,7 @@ if df is not None and not df.empty:
                 chart_df['時間'] = chart_df['紀錄時間'].dt.strftime('%H:%M')
                 chart_df['當前功率(kW)'] = chart_df['當前功率(W)'] / 1000.0
                 
-                # --- 圖表 1：即時功率 (kW) ---
+                # 圖表 1：即時功率 (kW)
                 fig_bar_kw = px.bar(
                     chart_df.sort_values('紀錄時間'), 
                     x="時間", 
@@ -187,7 +174,7 @@ if df is not None and not df.empty:
                 fig_bar_kw.update_layout(hovermode="x unified", xaxis_title="紀錄點", yaxis_title="即時功率 (kW)", barmode='stack')
                 st.plotly_chart(fig_bar_kw, use_container_width=True)
 
-                # --- 圖表 2：發電量 (kWh) ---
+                # 圖表 2：發電量 (kWh)
                 fig_bar_kwh = px.bar(
                     chart_df.sort_values('紀錄時間'), 
                     x="時間", 
