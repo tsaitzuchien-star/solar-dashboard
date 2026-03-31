@@ -86,20 +86,35 @@ if df is not None and not df.empty:
         last_year = current_year - 1
         df_current_year = monthly_total[monthly_total['年份'] == current_year]
         months_this_year = df_current_year['月份'].unique()
-
-        this_year_total_kwh = df_current_year['當月發電量(kWh)'].sum()
-        current_certs = int(this_year_total_kwh / 1000)
+        
+        # 🎯 [新增] 憑證精準推算邏輯 (以 2026-03-31 12:30 為基準錨點)
+        anchor_time = pd.to_datetime('2026-03-31 12:30:00')
+        anchor_certs = 56  # 1月(15) + 2月(19) + 3月已累積(22)
+        anchor_leftover_kwh = 286.691
+        
+        # 計算基準點之後的「新增發電量」
+        new_kwh_since_anchor = df[df['紀錄時間'] > anchor_time]['每段發電量(kWh)'].sum()
+        
+        # 總累積零頭
+        total_leftover_kwh = anchor_leftover_kwh + new_kwh_since_anchor
+        
+        # 換算新增張數與剩下的零頭
+        new_certs_earned = int(total_leftover_kwh // 1000)
+        current_leftover_kwh = total_leftover_kwh % 1000
+        
+        # 最終顯示數據
+        current_certs = anchor_certs + new_certs_earned
         target_certs = 210
         
-        # 🎯 取得歷史總發電量 (各系統最大累計度數的加總)
+        # 取得歷史總發電量
         all_time_total_kwh = df.groupby('系統名稱')['累計度數(kWh)'].max().sum()
         
-        col_cert1, col_cert2, col_cert3 = st.columns([1.5, 1, 3])
+        col_cert1, col_cert2, col_cert3 = st.columns([1.5, 1.2, 2.8])
         with col_cert1:
-            # ✨ 幫您把算出來的 119 萬度放進這裡了！以後它會自動往上加！
             st.metric("🌍 建置至今歷史總發電量", f"{all_time_total_kwh:,.2f} kWh")
         with col_cert2:
-            st.metric("📜 累積綠電憑證", f"{current_certs} 張", f"目標 {target_certs} 張")
+            # ✨ 動態顯示邁向「下一張」的進度
+            st.metric("📜 今年累積綠電憑證", f"{current_certs} 張", f"邁向第 {current_certs + 1} 張：{current_leftover_kwh:,.1f} / 1000 kWh", delta_color="off")
         with col_cert3:
             st.markdown(f"<div style='margin-top: 10px; font-size: 18px;'><b>🎯 年度目標達成率：{(current_certs/target_certs)*100:.1f}%</b></div>", unsafe_allow_html=True)
             st.progress(min(current_certs / target_certs, 1.0))
