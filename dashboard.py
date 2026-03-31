@@ -138,7 +138,7 @@ if df is not None and not df.empty:
         st.caption(f"🕒 最後更新點：**{latest_time.strftime('%H:%M')}** (圖表顯示範圍：06:00 - 18:00)")
 
         if not full_today_df.empty:
-            # 1. 頂部指標計算 (使用 full_today_df，抓取真實的 21:30 數據)
+            # 1. 頂部指標計算 (使用 full_today_df，抓取真實數據)
             df_latest = full_today_df[full_today_df['紀錄時間'] == latest_time]
             current_total_kw = df_latest['當前功率(W)'].sum() / 1000.0
             today_total_kwh = full_today_df['每段發電量(kWh)'].sum()
@@ -154,6 +154,21 @@ if df is not None and not df.empty:
                 chart_df['時間'] = chart_df['紀錄時間'].dt.strftime('%H:%M')
                 chart_df['當前功率(kW)'] = chart_df['當前功率(W)'] / 1000.0
                 
+                # --- 圖表 1：每 15 分鐘「即時功率 (kW)」長條圖 (移到前面囉！) ---
+                fig_bar_kw = px.bar(
+                    chart_df.sort_values('紀錄時間'), 
+                    x="時間", 
+                    y="當前功率(kW)", 
+                    color="系統名稱",
+                    title=f"{latest_time.date()} 發電功率時序圖 - 觀察出力強度 (kW)",
+                    template="plotly_white",
+                    color_discrete_sequence=px.colors.qualitative.Pastel,
+                    text_auto='.1f'
+                )
+                fig_bar_kw.update_layout(hovermode="x unified", xaxis_title="紀錄點", yaxis_title="即時功率 (kW)", barmode='stack')
+                st.plotly_chart(fig_bar_kw, use_container_width=True)
+
+                # --- 圖表 2：每 15 分鐘「發電量 (kWh)」長條圖 (移到後面囉！) ---
                 fig_bar_kwh = px.bar(
                     chart_df.sort_values('紀錄時間'), 
                     x="時間", 
@@ -167,18 +182,6 @@ if df is not None and not df.empty:
                 fig_bar_kwh.update_layout(hovermode="x unified", xaxis_title="紀錄點", yaxis_title="發電量增量 (kWh)", barmode='stack')
                 st.plotly_chart(fig_bar_kwh, use_container_width=True)
 
-                fig_bar_kw = px.bar(
-                    chart_df.sort_values('紀錄時間'), 
-                    x="時間", 
-                    y="當前功率(kW)", 
-                    color="系統名稱",
-                    title=f"{latest_time.date()} 發電功率時序圖 - 觀察出力強度 (kW)",
-                    template="plotly_white",
-                    color_discrete_sequence=px.colors.qualitative.Pastel,
-                    text_auto='.1f'
-                )
-                fig_bar_kw.update_layout(hovermode="x unified", xaxis_title="紀錄點", yaxis_title="即時功率 (kW)", barmode='stack')
-                st.plotly_chart(fig_bar_kw, use_container_width=True)
             else:
                 st.info("💡 目前時間不在 06:00 - 18:00 的圖表顯示範圍內。")
 
@@ -186,7 +189,7 @@ if df is not None and not df.empty:
             with st.expander("各子系統今日數據統計"):
                 sys_summary = full_today_df.groupby('系統名稱').agg({
                     '每段發電量(kWh)': 'sum',
-                    '當前功率(W)': 'last' # 現在這裡抓到的才是真正的 21:30 數據！
+                    '當前功率(W)': 'last' 
                 }).reset_index()
                 sys_summary.columns = ['系統名稱', '今日累積(kWh)', '最新功率(W)']
                 st.dataframe(sys_summary, use_container_width=True)
