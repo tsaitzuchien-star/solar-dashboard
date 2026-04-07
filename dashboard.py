@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 st.set_page_config(page_title="中創園區太陽能戰情室", layout="wide", page_icon="☀️")
 
 st.title("☀️ 中創園區太陽能監控戰情室")
-st.markdown("這套 11 年太陽能系統的活化數據，正由中創行政服務部實時守護中。(數據來源：國家再生能源憑證中心)")
+st.markdown("這套 11 年太陽能系統的活化數據，正由中創行政服務部實時守護中。(數據來源：國家再生能源憑證中心T-REC)")
 st.markdown("---")
 
 # ⏱️ 隱形計時器：每 15 分鐘自動重整
