@@ -102,7 +102,7 @@ if df is not None and not df.empty:
         
         col_cert1, col_cert2 = st.columns([1, 2.5])
         with col_cert1:
-            st.metric("📜 今年累積綠電憑證", f"{current_certs} 張", f"邁向第 {current_certs + 1} 張：{current_leftover_kwh:,.1f} / 1000 kWh", delta_color="off")
+            st.metric("📜 今年累積綠電憑證(目標210張)", f"{current_certs} 張", f"邁向第 {current_certs + 1} 張：{current_leftover_kwh:,.1f} / 1000 kWh", delta_color="off")
         with col_cert2:
             st.markdown(f"<div style='margin-top: 10px; font-size: 18px;'><b>🎯 年度目標達成率：{(current_certs/target_certs)*100:.1f}%</b></div>", unsafe_allow_html=True)
             st.progress(min(current_certs / target_certs, 1.0))
