@@ -32,4 +32,6 @@ jobs:
         env:
           TREC_ACCOUNT: ${{ secrets.TREC_ACCOUNT }}
           TREC_PASSWORD: ${{ secrets.TREC_PASSWORD }}
+          # 🎯 --- [新增] 把我們設定好的密碼傳遞給 Python 程式 --- 🎯
+          BOT_RUN_PASSWORD: ${{ secrets.BOT_RUN_PASSWORD }}
         run: python auto_bot.py
