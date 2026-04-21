@@ -3,6 +3,7 @@ import datetime
 import requests
 import gspread
 import re  # 🎯 引入正則表達式，用來精準萃取數字
+import getpass  # 🎯 引入 getpass，讓本機輸入密碼時不會顯示明碼
 from oauth2client.service_account import ServiceAccountCredentials
 from playwright.sync_api import sync_playwright
 
@@ -14,7 +15,30 @@ TREC_PASSWORD = os.environ.get("TREC_PASSWORD")
 # ==========================================
 
 def run_auto_bot():
-    print(f"🤖 [{datetime.datetime.now().strftime('%H:%M:%S')}] 自動機器人啟動中 (GitHub Actions 雲端模式)...")
+    print(f"🤖 [{datetime.datetime.now().strftime('%H:%M:%S')}] 自動機器人啟動中...")
+
+    # 🎯 --- [新增] 雙軌密碼驗證機制 --- 🎯
+    default_pwd = "ASCH300!"
+    
+    # 判斷是否在 GitHub Actions 環境中執行
+    if os.environ.get("GITHUB_ACTIONS"):
+        # 模式 A：雲端執行 (透過 GitHub Secrets 的環境變數驗證)
+        action_pwd = os.environ.get("BOT_RUN_PASSWORD")
+        if action_pwd != default_pwd:
+             print("❌ 雲端執行密碼錯誤！請確認 GitHub Secrets 中的 BOT_RUN_PASSWORD 是否正確。")
+             return
+        print("   ✅ 雲端密碼驗證通過！")
+    else:
+        # 模式 B：本機執行 (要求使用者手動輸入)
+        input_pwd = getpass.getpass(f"   🔐 請輸入啟動密碼 (直接按 Enter 可帶入預設密碼): ")
+        if input_pwd == "":
+            input_pwd = default_pwd
+            
+        if input_pwd != default_pwd:
+            print("   ❌ 密碼錯誤！機器人終止執行。")
+            return
+        print("   ✅ 本機密碼驗證通過！")
+    # ----------------------------------------
 
     if not TREC_ACCOUNT or not TREC_PASSWORD:
         print("❌ 錯誤：找不到帳號或密碼！請確認 GitHub Secrets 設定是否正確。")
