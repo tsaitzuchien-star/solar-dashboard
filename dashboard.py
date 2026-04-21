@@ -14,22 +14,52 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 st.set_page_config(page_title="中創園區太陽能戰情室", layout="wide", page_icon="☀️")
 
 # ==========================================
-# 🔐 [新增] 網頁前端密碼攔截區塊
+# 🔐 [修正] 網頁前端密碼攔截區塊 (新增「確認登入」按鈕)
 # ==========================================
 def check_password():
-    # 在側邊欄建立密碼輸入框
-    user_pwd = st.sidebar.text_input("🔑 請輸入戰情室密碼", type="password")
-    
-    if user_pwd == "ASCH300!":
-        return True
-    elif user_pwd != "":
-        st.sidebar.error("密碼錯誤！請重新輸入。")
+    with st.sidebar:
+        user_pwd = st.text_input("🔑 請輸入戰情室密碼", type="password", help="輸入完請按 Enter 或點擊下方按鈕")
+        submit_button = st.button("確認登入", use_container_width=True)
+        
+        # 判斷邏輯：當按下按鈕或是輸入框有內容時進行驗證
+        if submit_button or (user_pwd != ""):
+            if user_pwd == "ASCH300!":
+                st.success("解鎖成功！")
+                return True
+            else:
+                if user_pwd != "":
+                    st.error("❌ 密碼錯誤，請重新輸入")
     return False
 
-# 密碼驗證防線：如果不通過，程式會在此強制停止，保護下方數據
+# 密碼驗證防線：如果不通過，程式會在此強制停止
 if not check_password():
-    st.warning("🔒 戰情室已鎖定。請在左側側邊欄輸入密碼以查看太陽能數據。")
+    st.info("💡 提示：請在左側選單輸入密碼以進入中創園區太陽能戰情室。")
     st.stop()
+# ==========================================
+
+# ==========================================
+# 🎨 [新增] RWD 排版優化 CSS (解決老闆在意的版面跑版、斷行問題)
+# ==========================================
+st.markdown(
+    """
+    <style>
+    /* 防止指標標題斷行，確保在一行內顯示 */
+    div[data-testid="stMetricLabel"] {
+        white-space: nowrap !important;
+        font-size: 14px !important;
+    }
+    /* 稍微縮小數值字體，避免擠壓到旁邊的欄位 */
+    div[data-testid="stMetricValue"] {
+        font-size: 1.8rem !important;
+    }
+    /* 讓下方輔助說明文字 (Delta) 也能對齊 */
+    div[data-testid="stMetricDelta"] {
+        font-size: 12px !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 # ==========================================
 
 # --- 驗證通過後，才會執行以下的戰情室畫面與資料抓取 ---
