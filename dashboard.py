@@ -10,7 +10,29 @@ from oauth2client.service_account import ServiceAccountCredentials
 # 🤫 幫 Plotly 戴上耳塞
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+# ⚠️ 關鍵：set_page_config 必須是第一個 Streamlit 指令，不能移動
 st.set_page_config(page_title="中創園區太陽能戰情室", layout="wide", page_icon="☀️")
+
+# ==========================================
+# 🔐 [新增] 網頁前端密碼攔截區塊
+# ==========================================
+def check_password():
+    # 在側邊欄建立密碼輸入框
+    user_pwd = st.sidebar.text_input("🔑 請輸入戰情室密碼", type="password")
+    
+    if user_pwd == "ASCH300!":
+        return True
+    elif user_pwd != "":
+        st.sidebar.error("密碼錯誤！請重新輸入。")
+    return False
+
+# 密碼驗證防線：如果不通過，程式會在此強制停止，保護下方數據
+if not check_password():
+    st.warning("🔒 戰情室已鎖定。請在左側側邊欄輸入密碼以查看太陽能數據。")
+    st.stop()
+# ==========================================
+
+# --- 驗證通過後，才會執行以下的戰情室畫面與資料抓取 ---
 
 st.title("☀️ 中創園區太陽能監控戰情室")
 st.markdown("這套 11 年太陽能系統的活化數據，正由中創行政服務部實時守護中。(數據來源：國家再生能源憑證中心T-REC)")
@@ -194,11 +216,9 @@ if df is not None and not df.empty:
                     '當前功率(W)': 'last' 
                 }).reset_index()
                 sys_summary.columns = ['系統名稱', '今日累積(kWh)', '最新功率(W)']
-                # 乾淨輸出，捨棄置中
                 st.dataframe(sys_summary, use_container_width=True)
 
         with st.expander("查看雲端原始數據庫"):
-            # 乾淨輸出，捨棄置中
             st.dataframe(df.sort_values('紀錄時間', ascending=False), use_container_width=True)
             
     except Exception as e:
