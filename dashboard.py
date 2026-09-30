@@ -54,7 +54,7 @@ SUN_SVG = (
 STYLE = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap');
-.block-container { padding-top: 2rem; max-width: 1400px; }
+.block-container { padding-top: 4.5rem; max-width: 1400px; }
 .stTabs [data-baseweb="tab"] { height: 44px; font-size: 15px; }
 .sd-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; font-family: 'Noto Sans TC', sans-serif; }
 .sd-brand { display: flex; align-items: center; gap: 16px; }
