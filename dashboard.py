@@ -162,20 +162,26 @@ if df is not None and not df.empty:
         st.markdown("<br>", unsafe_allow_html=True)
 
         if len(months_this_year) > 0:
-            cols = st.columns(len(months_this_year))
-            for i, m in enumerate(sorted(months_this_year)):
-                this_year_kwh = monthly_total[(monthly_total['年份'] == current_year) & (monthly_total['月份'] == m)]['當月發電量(kWh)'].sum()
-                last_year_kwh = monthly_total[(monthly_total['年份'] == last_year) & (monthly_total['月份'] == m)]['當月發電量(kWh)'].sum()
+            # 每排最多 4 個月份，超過自動換行，避免 9~12 月全擠在同一排而被截斷
+            MONTHS_PER_ROW = 4
+            sorted_months = sorted(months_this_year)
+            for row_start in range(0, len(sorted_months), MONTHS_PER_ROW):
+                row_months = sorted_months[row_start:row_start + MONTHS_PER_ROW]
+                # 固定欄數：最後一排不足 4 個時，欄寬仍與上面對齊
+                cols = st.columns(MONTHS_PER_ROW)
+                for i, m in enumerate(row_months):
+                    this_year_kwh = monthly_total[(monthly_total['年份'] == current_year) & (monthly_total['月份'] == m)]['當月發電量(kWh)'].sum()
+                    last_year_kwh = monthly_total[(monthly_total['年份'] == last_year) & (monthly_total['月份'] == m)]['當月發電量(kWh)'].sum()
 
-                if last_year_kwh > 0:
-                    diff = this_year_kwh - last_year_kwh
-                    diff_pct = (diff / last_year_kwh) * 100
-                    delta_str = f"{diff:,.2f} kWh ({diff_pct:+.1f}% YoY)"
-                else:
-                    delta_str = "⚠️ 尚無去年同期資料"
+                    if last_year_kwh > 0:
+                        diff = this_year_kwh - last_year_kwh
+                        diff_pct = (diff / last_year_kwh) * 100
+                        delta_str = f"{diff:,.2f} kWh ({diff_pct:+.1f}% YoY)"
+                    else:
+                        delta_str = "⚠️ 尚無去年同期資料"
 
-                with cols[i]:
-                    st.metric(f"🎯 {m} 月份發電量", f"{this_year_kwh:,.2f} kWh", delta=delta_str)
+                    with cols[i]:
+                        st.metric(f"🎯 {m} 月份發電量", f"{this_year_kwh:,.2f} kWh", delta=delta_str)
         else:
             st.info(f"💡 目前資料庫尚未包含 {current_year} 年的數據。")
 
